@@ -231,35 +231,40 @@
     </div>
 
     <script>
-        // --- Web Audio API Cues ---
+        // --- Web Audio API Cues (Enhanced Volume & Multi-tone Features) ---
         class AudioFX {
             constructor() {
                 this.ctx = null;
+                this.masterGain = null;
             }
 
             init() {
                 if (!this.ctx) {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
                     this.ctx = new AudioContext();
+                    this.masterGain = this.ctx.createGain();
+                    // Set loud master output volume
+                    this.masterGain.gain.setValueAtTime(0.95, this.ctx.currentTime);
+                    this.masterGain.connect(this.ctx.destination);
                 }
                 if (this.ctx.state === 'suspended') {
                     this.ctx.resume();
                 }
             }
 
-            playBeep(freq = 600, duration = 0.15, type = 'sine') {
+            playBeep(freq = 600, duration = 0.15, type = 'square', volume = 0.9) {
                 try {
                     this.init();
                     const osc = this.ctx.createOscillator();
                     const gain = this.ctx.createGain();
-                    osc.type = type;
-                    osc.frequency.value = freq;
+                    osc.type = type; // 'square' or 'triangle' for louder cut-through tone
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
 
-                    gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(volume, this.ctx.currentTime);
                     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
 
                     osc.connect(gain);
-                    gain.connect(this.ctx.destination);
+                    gain.connect(this.masterGain);
 
                     osc.start();
                     osc.stop(this.ctx.currentTime + duration);
@@ -268,17 +273,30 @@
                 }
             }
 
-            playSetComplete() {
-                this.playBeep(523.25, 0.15); // C5
-                setTimeout(() => this.playBeep(659.25, 0.15), 150); // E5
-                setTimeout(() => this.playBeep(783.99, 0.3), 300); // G5
+            // Warning sound 10 seconds before a new set
+            playTenSecWarning() {
+                this.playBeep(523.25, 0.12, 'square', 0.9); // C5
+                setTimeout(() => this.playBeep(659.25, 0.18, 'square', 0.95), 140); // E5
             }
 
+            // 3, 2, 1 Countdown Beeps
+            playCountdownBeep() {
+                this.playBeep(880, 0.15, 'square', 1.0); // High A5 pitch
+            }
+
+            // 3 Sounds in rapid succession when a new interval/set starts
+            playNewSetTripleBeep() {
+                this.playBeep(523.25, 0.1, 'triangle', 0.95);
+                setTimeout(() => this.playBeep(659.25, 0.1, 'triangle', 0.95), 110);
+                setTimeout(() => this.playBeep(783.99, 0.25, 'triangle', 1.0), 220);
+            }
+
+            // All Sets Finished Victory Sound
             playAllFinished() {
-                this.playBeep(523.25, 0.2);
-                setTimeout(() => this.playBeep(659.25, 0.2), 200);
-                setTimeout(() => this.playBeep(783.99, 0.2), 400);
-                setTimeout(() => this.playBeep(1046.50, 0.6, 'triangle'), 600); // C6
+                this.playBeep(523.25, 0.15, 'square', 0.9);
+                setTimeout(() => this.playBeep(659.25, 0.15, 'square', 0.9), 160);
+                setTimeout(() => this.playBeep(783.99, 0.15, 'square', 0.95), 320);
+                setTimeout(() => this.playBeep(1046.50, 0.5, 'square', 1.0), 480);
             }
         }
 
@@ -563,8 +581,8 @@
             // Activate Screen Wake Lock
             await requestWakeLock();
 
-            // Audio Cue
-            audio.playBeep(880, 0.2);
+            // Audio Cue on start (3 rapid sounds for 1st interval)
+            audio.playNewSetTripleBeep();
 
             // Switch Views
             setupView.classList.add('hidden');
@@ -593,11 +611,15 @@
             state.totalSecondsRemaining--;
             state.currentSetSecondsRemaining--;
 
-            // Check Set Transition
+            // Check Set Transition & Sound Triggers
             if (state.currentSetSecondsRemaining <= 0 && state.currentSet < state.totalSets) {
-                audio.playSetComplete();
                 state.currentSet++;
                 state.currentSetSecondsRemaining = state.perSetSeconds;
+                audio.playNewSetTripleBeep(); // 3 rapid sounds on new interval start
+            } else if (state.currentSetSecondsRemaining === 10) {
+                audio.playTenSecWarning(); // 10-second warning sound
+            } else if (state.currentSetSecondsRemaining >= 1 && state.currentSetSecondsRemaining <= 3) {
+                audio.playCountdownBeep(); // 3, 2, 1 countdown sounds
             }
 
             updateTimerUI();
