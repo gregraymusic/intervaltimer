@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Target End Time Interval Timer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Font Inter & Lucide Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        /* Custom smooth transition for progress ring */
+        .progress-ring-circle {
+            transition: stroke-dashoffset 0.3s ease;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        /* Touch feedback animations */
+        .active-scale:active {
+            transform: scale(0.96);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-300">
+
+    <!-- App Container (Mobile Centered) -->
+    <div id="app" class="w-full max-w-md mx-auto min-h-screen flex flex-col justify-between p-5 relative overflow-hidden">
+        
+        <!-- Top Navigation / Header -->
+        <header class="flex justify-between items-center py-2 z-10">
+            <div class="flex items-center space-x-2">
+                <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl">
+                    <i data-lucide="timer" class="w-6 h-6"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
+                    Target Timer
+                </h1>
+            </div>
+            <button id="themeToggle" class="p-3 bg-slate-800 border border-slate-700/60 rounded-2xl text-slate-300 active-scale shadow-sm focus:outline-none">
+                <i data-lucide="sun" id="themeIcon" class="w-5 h-5"></i>
+            </button>
+        </header>
+
+        <!-- VIEW 1: SETUP FORM -->
+        <main id="setupView" class="flex-1 flex flex-col justify-center space-y-6 py-6 z-10">
+            
+            <!-- Instructions / Headline -->
+            <div class="text-center space-y-1">
+                <h2 class="text-2xl font-extrabold tracking-tight">Set Your Target</h2>
+                <p class="text-slate-400 text-sm">Timer evenly splits total time into sets</p>
+            </div>
+
+            <!-- Number of Sets Input -->
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-3xl p-5 shadow-lg backdrop-blur-sm space-y-3">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-400 block text-center">
+                    Number of Sets
+                </label>
+                <div class="flex items-center justify-between space-x-4">
+                    <button type="button" id="btnMinusSets" class="w-16 h-16 rounded-2xl bg-slate-700 hover:bg-slate-650 text-indigo-400 text-2xl font-bold flex items-center justify-center active-scale shadow-md focus:outline-none border border-slate-600">
+                        <i data-lucide="minus" class="w-7 h-7"></i>
+                    </button>
+                    
+                    <div class="flex-1 text-center">
+                        <input type="number" id="setsInput" value="4" min="1" max="99" 
+                            class="w-full bg-transparent text-center text-4xl font-black text-white focus:outline-none border-b-2 border-indigo-500/50 pb-1">
+                        <span class="text-xs text-slate-400 font-medium mt-1 block">SETS</span>
+                    </div>
+
+                    <button type="button" id="btnPlusSets" class="w-16 h-16 rounded-2xl bg-slate-700 hover:bg-slate-650 text-indigo-400 text-2xl font-bold flex items-center justify-center active-scale shadow-md focus:outline-none border border-slate-600">
+                        <i data-lucide="plus" class="w-7 h-7"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- End Time Input Card -->
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-3xl p-5 shadow-lg backdrop-blur-sm space-y-3">
+                <div class="flex justify-between items-center">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Target End Time
+                    </label>
+                    <span id="currentTimeDisplay" class="text-xs font-semibold text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full">
+                        Now: --:-- --
+                    </span>
+                </div>
+
+                <div class="relative flex items-center bg-slate-900/80 rounded-2xl border border-slate-700/80 p-3">
+                    <i data-lucide="clock" class="w-6 h-6 text-indigo-400 ml-2 mr-3 flex-shrink-0"></i>
+                    <input type="time" id="endTimeInput" step="60"
+                        class="bg-transparent text-2xl font-bold text-white w-full focus:outline-none cursor-pointer [color-scheme:dark]">
+                </div>
+                
+                <!-- Quick Time Presets -->
+                <div class="grid grid-cols-3 gap-2 pt-1">
+                    <button type="button" data-add-mins="15" class="preset-btn bg-slate-700/60 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl text-xs font-semibold active-scale border border-slate-600/50">
+                        +15 min
+                    </button>
+                    <button type="button" data-add-mins="30" class="preset-btn bg-slate-700/60 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl text-xs font-semibold active-scale border border-slate-600/50">
+                        +30 min
+                    </button>
+                    <button type="button" data-add-mins="60" class="preset-btn bg-slate-700/60 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl text-xs font-semibold active-scale border border-slate-600/50">
+                        +1 hr
+                    </button>
+                </div>
+            </div>
+
+            <!-- Calculated Summary Card -->
+            <div id="summaryBox" class="bg-indigo-950/40 border border-indigo-800/40 rounded-2xl p-4 flex justify-around items-center text-center">
+                <div>
+                    <span class="text-xs text-indigo-300/80 block font-medium">Total Duration</span>
+                    <span id="summaryTotalDuration" class="text-lg font-bold text-indigo-200">--:--</span>
+                </div>
+                <div class="h-8 w-px bg-indigo-800/50"></div>
+                <div>
+                    <span class="text-xs text-indigo-300/80 block font-medium">Per Set</span>
+                    <span id="summarySetDuration" class="text-lg font-bold text-indigo-200">--:--</span>
+                </div>
+            </div>
+
+            <!-- Validation Error Alert -->
+            <div id="errorMessage" class="hidden bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-medium p-3 rounded-2xl text-center flex items-center justify-center space-x-2">
+                <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                <span id="errorText">End time must be later than current time.</span>
+            </div>
+
+        </main>
+
+        <!-- VIEW 2: ACTIVE TIMER DISPLAY (Hidden initially) -->
+        <main id="timerView" class="hidden flex-1 flex flex-col justify-between py-4 z-10">
+            
+            <!-- Set Progress Indicator Header -->
+            <div class="text-center space-y-1">
+                <div class="inline-flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/20 px-4 py-1.5 rounded-full">
+                    <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+                    <span id="activeSetBadge" class="text-sm font-bold text-indigo-300 tracking-wide uppercase">
+                        SET 1 OF 4
+                    </span>
+                </div>
+            </div>
+
+            <!-- Circular Timer Container -->
+            <div class="relative w-72 h-72 mx-auto my-auto flex items-center justify-center">
+                <!-- SVG Progress Ring -->
+                <svg class="w-full h-full" viewBox="0 0 100 100">
+                    <!-- Background Circle -->
+                    <circle class="text-slate-800" stroke-width="6" stroke="currentColor" fill="transparent" r="42" cx="50" cy="50" />
+                    <!-- Foreground Ring -->
+                    <circle id="progressRing" class="progress-ring-circle text-indigo-500" stroke-width="6" stroke-linecap="round"
+                        stroke="currentColor" fill="transparent" r="42" cx="50" cy="50" stroke-dasharray="263.89" stroke-dashoffset="0" />
+                </svg>
+
+                <!-- Timer Inner Text -->
+                <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase mb-1">Set Time Left</span>
+                    <span id="setCountdownDisplay" class="text-5xl font-black tracking-tight text-white font-mono">
+                        00:00
+                    </span>
+                    <span id="perSetTotalTag" class="text-xs text-indigo-400 font-medium mt-1">
+                        / 00:00 per set
+                    </span>
+                </div>
+            </div>
+
+            <!-- Overall Progress Details -->
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-3xl p-4 shadow-lg space-y-2">
+                <div class="flex justify-between text-xs font-medium text-slate-400">
+                    <span>Overall Target Progress</span>
+                    <span id="overallPercentText">0%</span>
+                </div>
+                
+                <!-- Overall Bar -->
+                <div class="w-full h-3 bg-slate-700/80 rounded-full overflow-hidden">
+                    <div id="overallProgressBar" class="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-300 w-0"></div>
+                </div>
+
+                <div class="flex justify-between text-xs text-slate-400 pt-1">
+                    <div>Ends at: <span id="targetTimeLabel" class="text-slate-200 font-semibold">--:--</span></div>
+                    <div>Total Left: <span id="totalRemainingLabel" class="text-slate-200 font-semibold font-mono">--:--</span></div>
+                </div>
+            </div>
+
+            <!-- Pause / Play Controls -->
+            <div class="flex items-center space-x-3 pt-2">
+                <button id="btnPauseResume" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold py-4 rounded-2xl flex items-center justify-center space-x-2 active-scale shadow-lg">
+                    <i data-lucide="pause" id="pauseIcon" class="w-6 h-6"></i>
+                    <span id="pauseBtnText">Pause</span>
+                </button>
+                <button id="btnReset" class="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 rounded-2xl flex items-center justify-center active-scale">
+                    <i data-lucide="square" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </main>
+
+        <!-- VIEW FOOTER: Big Action Button -->
+        <footer id="setupFooter" class="pt-4 z-10">
+            <button id="btnStart" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-black text-xl py-5 rounded-3xl shadow-xl shadow-indigo-600/30 flex items-center justify-center space-x-3 active-scale transition-all duration-200">
+                <i data-lucide="play" class="w-7 h-7 fill-current"></i>
+                <span>START TIMER</span>
+            </button>
+        </footer>
+
+    </div>
+
+    <script>
+        // --- Web Audio API Cues ---
+        class AudioFX {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playBeep(freq = 600, duration = 0.15, type = 'sine') {
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.value = freq;
+
+                    gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {
+                    console.error("Audio playback error", e);
+                }
+            }
+
+            playSetComplete() {
+                this.playBeep(523.25, 0.15); // C5
+                setTimeout(() => this.playBeep(659.25, 0.15), 150); // E5
+                setTimeout(() => this.playBeep(783.99, 0.3), 300); // G5
+            }
+
+            playAllFinished() {
+                this.playBeep(523.25, 0.2);
+                setTimeout(() => this.playBeep(659.25, 0.2), 200);
+                setTimeout(() => this.playBeep(783.99, 0.2), 400);
+                setTimeout(() => this.playBeep(1046.50, 0.6, 'triangle'), 600); // C6
+            }
+        }
+
+        const audio = new AudioFX();
+
+        // --- App State ---
+        let state = {
+            totalSets: 4,
+            targetEndTime: null, // Date object
+            perSetSeconds: 0,
+            totalDurationSeconds: 0,
+            currentSet: 1,
+            currentSetSecondsRemaining: 0,
+            totalSecondsRemaining: 0,
+            isRunning: false,
+            isPaused: false,
+            timerInterval: null,
+            clockInterval: null,
+            isDarkMode: true
+        };
+
+        // --- DOM Elements ---
+        const setsInput = document.getElementById('setsInput');
+        const btnMinusSets = document.getElementById('btnMinusSets');
+        const btnPlusSets = document.getElementById('btnPlusSets');
+        const endTimeInput = document.getElementById('endTimeInput');
+        const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+        const summaryTotalDuration = document.getElementById('summaryTotalDuration');
+        const summarySetDuration = document.getElementById('summarySetDuration');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+
+        const setupView = document.getElementById('setupView');
+        const timerView = document.getElementById('timerView');
+        const setupFooter = document.getElementById('setupFooter');
+        const btnStart = document.getElementById('btnStart');
+
+        const activeSetBadge = document.getElementById('activeSetBadge');
+        const setCountdownDisplay = document.getElementById('setCountdownDisplay');
+        const perSetTotalTag = document.getElementById('perSetTotalTag');
+        const progressRing = document.getElementById('progressRing');
+        const overallProgressBar = document.getElementById('overallProgressBar');
+        const overallPercentText = document.getElementById('overallPercentText');
+        const targetTimeLabel = document.getElementById('targetTimeLabel');
+        const totalRemainingLabel = document.getElementById('totalRemainingLabel');
+
+        const btnPauseResume = document.getElementById('btnPauseResume');
+        const pauseIcon = document.getElementById('pauseIcon');
+        const pauseBtnText = document.getElementById('pauseBtnText');
+        const btnReset = document.getElementById('btnReset');
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+
+        // SVG Circle parameters
+        const RADIUS = 42;
+        const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+        // --- Helper Functions ---
+        function formatTime12H(date) {
+            let hours = date.getHours();
+            const minutes = date.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            const strMinutes = minutes < 10 ? '0' + minutes : minutes;
+            return `${hours}:${strMinutes} ${ampm}`;
+        }
+
+        function formatHMS(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+
+            const pad = (n) => n.toString().padStart(2, '0');
+
+            if (h > 0) {
+                return `${h}:${pad(m)}:${pad(s)}`;
+            }
+            return `${pad(m)}:${pad(s)}`;
+        }
+
+        function setRingProgress(percent) {
+            const offset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
+            progressRing.style.strokeDasharray = `${CIRCUMFERENCE} ${CIRCUMFERENCE}`;
+            progressRing.style.strokeDashoffset = offset;
+        }
+
+        function updateLiveClock() {
+            const now = new Date();
+            currentTimeDisplay.textContent = `Now: ${formatTime12H(now)}`;
+            calculateSummary();
+        }
+
+        function getTargetDateFromInput() {
+            const timeVal = endTimeInput.value;
+            if (!timeVal) return null;
+
+            const [hours, minutes] = timeVal.split(':').map(Number);
+            const target = new Date();
+            target.setHours(hours, minutes, 0, 0);
+
+            // If selected time is earlier than current time today, assume target is tomorrow
+            if (target <= new Date()) {
+                target.setDate(target.getDate() + 1);
+            }
+            return target;
+        }
+
+        function calculateSummary() {
+            const targetDate = getTargetDateFromInput();
+            const numSets = parseInt(setsInput.value) || 1;
+
+            if (!targetDate) return;
+
+            const now = new Date();
+            const diffMs = targetDate - now;
+            const totalSec = Math.max(0, Math.floor(diffMs / 1000));
+
+            if (totalSec <= 0) {
+                errorMessage.classList.remove('hidden');
+                errorText.textContent = "Target time must be in the future.";
+                summaryTotalDuration.textContent = "--:--";
+                summarySetDuration.textContent = "--:--";
+                return false;
+            }
+
+            errorMessage.classList.add('hidden');
+            const perSetSec = Math.floor(totalSec / numSets);
+
+            summaryTotalDuration.textContent = formatHMS(totalSec);
+            summarySetDuration.textContent = formatHMS(perSetSec);
+
+            return { totalSec, perSetSec, targetDate };
+        }
+
+        // --- Initialization ---
+        function initDefaults() {
+            // Set default time to 1 hour ahead
+            const defaultTarget = new Date(Date.now() + 60 * 60 * 1000);
+            const hours = String(defaultTarget.getHours()).padStart(2, '0');
+            const minutes = String(defaultTarget.getMinutes()).padStart(2, '0');
+            endTimeInput.value = `${hours}:${minutes}`;
+
+            // Initialize Lucide icons
+            lucide.createIcons();
+
+            // Start live clock updates
+            updateLiveClock();
+            state.clockInterval = setInterval(updateLiveClock, 1000);
+        }
+
+        // --- Event Listeners ---
+        btnMinusSets.addEventListener('click', () => {
+            let val = parseInt(setsInput.value) || 1;
+            if (val > 1) {
+                setsInput.value = val - 1;
+                calculateSummary();
+            }
+        });
+
+        btnPlusSets.addEventListener('click', () => {
+            let val = parseInt(setsInput.value) || 1;
+            if (val < 99) {
+                setsInput.value = val + 1;
+                calculateSummary();
+            }
+        });
+
+        setsInput.addEventListener('input', calculateSummary);
+        endTimeInput.addEventListener('change', calculateSummary);
+
+        // Quick Preset Buttons (+15m, +30m, +1h)
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const addMins = parseInt(btn.dataset.addMins);
+                const target = new Date(Date.now() + addMins * 60 * 1000);
+                const hours = String(target.getHours()).padStart(2, '0');
+                const minutes = String(target.getMinutes()).padStart(2, '0');
+                endTimeInput.value = `${hours}:${minutes}`;
+                calculateSummary();
+            });
+        });
+
+        // Theme Toggle (Dark/Light)
+        themeToggle.addEventListener('click', () => {
+            state.isDarkMode = !state.isDarkMode;
+            if (state.isDarkMode) {
+                document.body.classList.remove('bg-slate-100', 'text-slate-800');
+                document.body.classList.add('bg-slate-900', 'text-slate-100');
+                themeIcon.setAttribute('data-lucide', 'sun');
+            } else {
+                document.body.classList.remove('bg-slate-900', 'text-slate-100');
+                document.body.classList.add('bg-slate-100', 'text-slate-800');
+                themeIcon.setAttribute('data-lucide', 'moon');
+            }
+            lucide.createIcons();
+        });
+
+        // --- Timer Controller ---
+        btnStart.addEventListener('click', () => {
+            audio.init();
+            const summary = calculateSummary();
+            if (!summary) return;
+
+            state.totalSets = parseInt(setsInput.value) || 4;
+            state.totalDurationSeconds = summary.totalSec;
+            state.perSetSeconds = summary.perSetSec;
+            state.targetEndTime = summary.targetDate;
+
+            state.currentSet = 1;
+            state.currentSetSecondsRemaining = state.perSetSeconds;
+            state.totalSecondsRemaining = state.totalDurationSeconds;
+            state.isRunning = true;
+            state.isPaused = false;
+
+            // Audio Cue
+            audio.playBeep(880, 0.2);
+
+            // Switch Views
+            setupView.classList.add('hidden');
+            setupFooter.classList.add('hidden');
+            timerView.classList.remove('hidden');
+
+            // Render Initial Active State
+            targetTimeLabel.textContent = formatTime12H(state.targetEndTime);
+            perSetTotalTag.textContent = `/ ${formatHMS(state.perSetSeconds)} per set`;
+
+            updateTimerUI();
+
+            // Start Countdown Tick Interval
+            if (state.timerInterval) clearInterval(state.timerInterval);
+            state.timerInterval = setInterval(tickTimer, 1000);
+        });
+
+        function tickTimer() {
+            if (state.isPaused) return;
+
+            if (state.totalSecondsRemaining <= 0) {
+                finishTimer();
+                return;
+            }
+
+            state.totalSecondsRemaining--;
+            state.currentSetSecondsRemaining--;
+
+            // Check Set Transition
+            if (state.currentSetSecondsRemaining <= 0 && state.currentSet < state.totalSets) {
+                audio.playSetComplete();
+                state.currentSet++;
+                state.currentSetSecondsRemaining = state.perSetSeconds;
+            }
+
+            updateTimerUI();
+        }
+
+        function updateTimerUI() {
+            // 1. Badge
+            activeSetBadge.textContent = `SET ${state.currentSet} OF ${state.totalSets}`;
+
+            // 2. Set Ring & Digital Clock
+            setCountdownDisplay.textContent = formatHMS(state.currentSetSecondsRemaining);
+            const setPct = (state.currentSetSecondsRemaining / state.perSetSeconds) * 100;
+            setRingProgress(setPct);
+
+            // 3. Overall Progress Bar
+            const elapsedTotal = state.totalDurationSeconds - state.totalSecondsRemaining;
+            const overallPct = Math.min(100, Math.max(0, (elapsedTotal / state.totalDurationSeconds) * 100));
+            overallProgressBar.style.width = `${overallPct}%`;
+            overallPercentText.textContent = `${Math.round(overallPct)}%`;
+            totalRemainingLabel.textContent = formatHMS(state.totalSecondsRemaining);
+        }
+
+        function finishTimer() {
+            clearInterval(state.timerInterval);
+            state.isRunning = false;
+            audio.playAllFinished();
+
+            setCountdownDisplay.textContent = "00:00";
+            setRingProgress(0);
+            overallProgressBar.style.width = "100%";
+            overallPercentText.textContent = "100%";
+            totalRemainingLabel.textContent = "00:00";
+            activeSetBadge.textContent = "COMPLETED!";
+
+            // Highlight Completion
+            progressRing.classList.remove('text-indigo-500');
+            progressRing.classList.add('text-emerald-400');
+        }
+
+        // Pause/Resume Logic
+        btnPauseResume.addEventListener('click', () => {
+            if (!state.isRunning) return;
+
+            state.isPaused = !state.isPaused;
+            if (state.isPaused) {
+                pauseBtnText.textContent = "Resume";
+                pauseIcon.setAttribute('data-lucide', 'play');
+            } else {
+                pauseBtnText.textContent = "Pause";
+                pauseIcon.setAttribute('data-lucide', 'pause');
+            }
+            lucide.createIcons();
+        });
+
+        // Reset Logic
+        btnReset.addEventListener('click', () => {
+            clearInterval(state.timerInterval);
+            state.isRunning = false;
+            state.isPaused = false;
+
+            // Restore SVG styling
+            progressRing.classList.remove('text-emerald-400');
+            progressRing.classList.add('text-indigo-500');
+
+            pauseBtnText.textContent = "Pause";
+            pauseIcon.setAttribute('data-lucide', 'pause');
+
+            // Switch Back to Setup View
+            timerView.classList.add('hidden');
+            setupView.classList.remove('hidden');
+            setupFooter.classList.remove('hidden');
+
+            lucide.createIcons();
+            calculateSummary();
+        });
+
+        // Initialize on window load
+        window.onload = () => {
+            initDefaults();
+        };
+    </script>
+</body>
+</html>
