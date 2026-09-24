@@ -151,13 +151,19 @@
         <!-- VIEW 2: ACTIVE TIMER DISPLAY (Hidden initially) -->
         <main id="timerView" class="hidden flex-1 flex flex-col justify-between py-4 z-10">
             
-            <!-- Set Progress Indicator Header -->
-            <div class="text-center space-y-1">
+            <!-- Set Progress Indicator Header & Screen Wake Indicator -->
+            <div class="text-center space-y-2">
                 <div class="inline-flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/20 px-4 py-1.5 rounded-full">
                     <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
                     <span id="activeSetBadge" class="text-sm font-bold text-indigo-300 tracking-wide uppercase">
                         SET 1 OF 4
                     </span>
+                </div>
+
+                <!-- Wake Lock Status Indicator -->
+                <div id="wakeLockBadge" class="flex items-center justify-center space-x-1.5 text-xs text-slate-400 font-medium">
+                    <i data-lucide="lock" id="wakeLockIcon" class="w-3.5 h-3.5 text-amber-400"></i>
+                    <span id="wakeLockText" class="text-amber-300/90">Screen Awake Active</span>
                 </div>
             </div>
 
@@ -277,6 +283,72 @@
         }
 
         const audio = new AudioFX();
+
+        // --- Wake Lock Controller ---
+        let wakeLock = null;
+
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    updateWakeLockUI(true);
+                    
+                    wakeLock.addEventListener('release', () => {
+                        updateWakeLockUI(false);
+                    });
+                } catch (err) {
+                    console.warn(`Wake Lock Request Error: ${err.name}, ${err.message}`);
+                    updateWakeLockUI(false, "Wake Lock Blocked");
+                }
+            } else {
+                updateWakeLockUI(false, "Wake Lock Unsupported");
+            }
+        }
+
+        async function releaseWakeLock() {
+            if (wakeLock !== null) {
+                try {
+                    await wakeLock.release();
+                    wakeLock = null;
+                } catch (err) {
+                    console.warn(`Wake Lock Release Error: ${err.name}, ${err.message}`);
+                }
+            }
+            updateWakeLockUI(false);
+        }
+
+        function updateWakeLockUI(isActive, customMsg = null) {
+            const wakeLockBadge = document.getElementById('wakeLockBadge');
+            const wakeLockIcon = document.getElementById('wakeLockIcon');
+            const wakeLockText = document.getElementById('wakeLockText');
+
+            if (!wakeLockBadge || !wakeLockIcon || !wakeLockText) return;
+
+            if (customMsg) {
+                wakeLockIcon.setAttribute('data-lucide', 'lock-keyhole');
+                wakeLockIcon.className = "w-3.5 h-3.5 text-slate-500";
+                wakeLockText.textContent = customMsg;
+                wakeLockText.className = "text-slate-400";
+            } else if (isActive) {
+                wakeLockIcon.setAttribute('data-lucide', 'lock');
+                wakeLockIcon.className = "w-3.5 h-3.5 text-emerald-400 animate-pulse";
+                wakeLockText.textContent = "Screen Kept Awake";
+                wakeLockText.className = "text-emerald-300 font-semibold";
+            } else {
+                wakeLockIcon.setAttribute('data-lucide', 'unlock');
+                wakeLockIcon.className = "w-3.5 h-3.5 text-slate-400";
+                wakeLockText.textContent = "Screen Awake Off";
+                wakeLockText.className = "text-slate-400";
+            }
+            lucide.createIcons();
+        }
+
+        // Re-acquire wake lock if tab/app becomes visible again while timer running
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible' && state.isRunning && !state.isPaused) {
+                await requestWakeLock();
+            }
+        });
 
         // --- App State ---
         let state = {
@@ -472,7 +544,7 @@
         });
 
         // --- Timer Controller ---
-        btnStart.addEventListener('click', () => {
+        btnStart.addEventListener('click', async () => {
             audio.init();
             const summary = calculateSummary();
             if (!summary) return;
@@ -487,6 +559,9 @@
             state.totalSecondsRemaining = state.totalDurationSeconds;
             state.isRunning = true;
             state.isPaused = false;
+
+            // Activate Screen Wake Lock
+            await requestWakeLock();
 
             // Audio Cue
             audio.playBeep(880, 0.2);
@@ -545,9 +620,13 @@
             totalRemainingLabel.textContent = formatHMS(state.totalSecondsRemaining);
         }
 
-        function finishTimer() {
+        async function finishTimer() {
             clearInterval(state.timerInterval);
             state.isRunning = false;
+            
+            // Release wake lock on timer completion
+            await releaseWakeLock();
+
             audio.playAllFinished();
 
             setCountdownDisplay.textContent = "00:00";
@@ -563,25 +642,30 @@
         }
 
         // Pause/Resume Logic
-        btnPauseResume.addEventListener('click', () => {
+        btnPauseResume.addEventListener('click', async () => {
             if (!state.isRunning) return;
 
             state.isPaused = !state.isPaused;
             if (state.isPaused) {
                 pauseBtnText.textContent = "Resume";
                 pauseIcon.setAttribute('data-lucide', 'play');
+                await releaseWakeLock();
             } else {
                 pauseBtnText.textContent = "Pause";
                 pauseIcon.setAttribute('data-lucide', 'pause');
+                await requestWakeLock();
             }
             lucide.createIcons();
         });
 
         // Reset Logic
-        btnReset.addEventListener('click', () => {
+        btnReset.addEventListener('click', async () => {
             clearInterval(state.timerInterval);
             state.isRunning = false;
             state.isPaused = false;
+
+            // Release Wake Lock
+            await releaseWakeLock();
 
             // Restore SVG styling
             progressRing.classList.remove('text-emerald-400');
